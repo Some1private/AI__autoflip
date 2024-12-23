@@ -85,15 +85,15 @@ jobs:
         run: |
           mkdir -p /video
           cd /video
-          wget -O input.mp4 "${VIDEO_URL}"
+          wget -O input.mp4 "${{ env.VIDEO_URL }}"
           
           cd /mediapipe
           bazel-bin/mediapipe/examples/desktop/autoflip/run_autoflip \
             --calculator_graph_config_file=/mediapipe/mediapipe/examples/desktop/autoflip/autoflip_graph_development.pbtxt \
-            --input_side_packets=input_video_path=/video/input.mp4,output_video_path=/video/output.mp4,aspect_ratio=${ASPECT_RATIO}
+            --input_side_packets=input_video_path=/video/input.mp4,output_video_path=/video/output.mp4,aspect_ratio=${{ env.ASPECT_RATIO }}
 
       - name: Upload Result
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: processed-video
           path: /video/output.mp4
