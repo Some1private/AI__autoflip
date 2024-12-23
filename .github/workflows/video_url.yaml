@@ -75,62 +75,25 @@ jobs:
     container:
 
       # Run the custom autoflip container.
-      image: docker://londonparkour/autoflip:latest
+      image: daniloleemes/autoflip:latest
       
     steps:
 
       # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#repository_dispatch
       # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#create-a-repository-dispatch-event
-      - name: Test the repository_dispatch fields
+      - name: Process Video
         run: |
-          echo "VIDEO_URL: ${VIDEO_URL}"
-          echo "ASPECT_RATIO: ${ASPECT_RATIO}"
-          echo "TARGET_OUTPUT_FOLDER: ${TARGET_OUTPUT_FOLDER}"
+          mkdir -p /video
+          cd /video
+          wget -O input.mp4 "${VIDEO_URL}"
+          
+          cd /mediapipe
+          bazel-bin/mediapipe/examples/desktop/autoflip/run_autoflip \
+            --calculator_graph_config_file=/mediapipe/mediapipe/examples/desktop/autoflip/autoflip_graph_development.pbtxt \
+            --input_side_packets=input_video_path=/video/input.mp4,output_video_path=/video/output.mp4,aspect_ratio=${ASPECT_RATIO}
 
-
-
-      - name: download video from url
-        run: |
-            wget ${VIDEO_URL} -O /video/video.mp4
-            mkdir -p /video/${TARGET_OUTPUT_FOLDER}
-
-
-
-      - name: run autoflip
-        run: |
-
-            cd /mediapipe
-            /bin/sh -c "bazel-bin/mediapipe/examples/desktop/autoflip/run_autoflip --calculator_graph_config_file=/mediapipe/mediapipe/examples/desktop/autoflip/autoflip_graph_development.pbtxt --input_side_packets=input_video_path=/video/${input_video},output_video_path=/video/${TARGET_OUTPUT_FOLDER}/${output_video},aspect_ratio=${ASPECT_RATIO},key_frame_crop_viz_frames_path=/video/${points_output},salient_point_viz_frames_path=/video/${frames_output}" || true
-            ls -la /video
-            ls -la /video/${TARGET_OUTPUT_FOLDER}
-
-
-      - name: Setup tools
-        run: |
-          apt-get update
-          apt-get install -y rsync ssh sshpass
-
-
-
-      - name: Copy Video to Server
-        run: |
-          mkdir ~/.ssh
-          ssh-keyscan -H ${{env.SERVER}} >> ~/.ssh/known_hosts
-
-          FOLDER_DATE=$(echo $VIDEO_URL | cut -d / -f5)
-          echo "FOLDER_DATE=${FOLDER_DATE}" >> $GITHUB_ENV 
-
-          FOLDER_CATEGORY=$(echo $VIDEO_URL | cut -d / -f6)
-          echo "FOLDER_CATEGORY=${FOLDER_CATEGORY}" >> $GITHUB_ENV 
-
-          SOURCE_DIR="/video/${TARGET_OUTPUT_FOLDER}"
-          TARGET_DIR="${TARGET_ROOT_FOLDER}/${FOLDER_DATE}/${FOLDER_CATEGORY}/"
-
-          echo "SOURCE DIR: ${SOURCE_DIR}"
-          echo "TARGET DIR: ${TARGET_DIR}"
-
-          sshpass -p '${{secrets.PASSWORD}}' scp -v -p -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SOURCE_DIR} ${{secrets.USER}}@${{env.SERVER}}:${TARGET_DIR}
-
-      - name: Trigger Google Script
-        run: |
-          curl "${SHEETS}?type=%22${TARGET_OUTPUT_FOLDER}%22&category=%22${{ env.FOLDER_CATEGORY }}%22&date=%22${{ env.FOLDER_DATE }}%22&filename=%22${output_video}%22"
+      - name: Upload Result
+        uses: actions/upload-artifact@v2
+        with:
+          name: processed-video
+          path: /video/output.mp4
