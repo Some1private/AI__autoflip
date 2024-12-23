@@ -75,7 +75,7 @@ jobs:
     container:
 
       # Run the custom autoflip container.
-      image: daniloleemes/autoflip:latest
+      image: kendiyang401/autoflip
       
     steps:
 
